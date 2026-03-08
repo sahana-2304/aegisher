@@ -1,0 +1,17 @@
+.env
+firebase_service_account.json
+backend/firebase_service_account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+venv/
+.venv/
+backend/venv/
