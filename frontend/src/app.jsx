@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import OnboardingScreen from "./screens/OnboardingScreen";
-import LoginScreen from "./screens/LoginScreen";
-import HomeScreen from "./screens/HomeScreen";
+
 import CommunityScreen from "./screens/CommunityScreen";
+import HomeScreen from "./screens/HomeScreen";
+import LoginScreen from "./screens/LoginScreen";
+import ModelTestingScreen from "./screens/ModelTestingScreen";
+import OnboardingScreen from "./screens/OnboardingScreen";
 import { getUser } from "./services/auth";
 import "./styles/global.css";
 
@@ -11,7 +13,7 @@ function SplashScreen() {
   return (
     <div className="splash">
       <div className="splash-logo">
-        <div className="shield-icon">⬡</div>
+        <div className="shield-icon">[]</div>
         <h1>AegisHer</h1>
         <p>Your safety, our mission</p>
       </div>
@@ -21,7 +23,6 @@ function SplashScreen() {
 
 function OnboardingPage({ onComplete }) {
   const navigate = useNavigate();
-
   return (
     <OnboardingScreen
       onComplete={(nextUser) => {
@@ -34,7 +35,6 @@ function OnboardingPage({ onComplete }) {
 
 function LoginPage({ onComplete }) {
   const navigate = useNavigate();
-
   return (
     <LoginScreen
       onComplete={(nextUser) => {
@@ -51,10 +51,10 @@ function MainShell({ children }) {
       <div className="screen-content">{children}</div>
       <nav className="bottom-nav">
         <NavLink to="/home" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
-          <span className="nav-icon">◈</span><span className="nav-label">Safety</span>
+          <span className="nav-icon">S</span><span className="nav-label">Safety</span>
         </NavLink>
         <NavLink to="/community" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
-          <span className="nav-icon">◎</span><span className="nav-label">Community</span>
+          <span className="nav-icon">C</span><span className="nav-label">Community</span>
         </NavLink>
       </nav>
     </div>
@@ -69,6 +69,7 @@ function ProtectedPage({ user, children }) {
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const isDevTools = import.meta.env.DEV;
 
   useEffect(() => {
     setUser(getUser());
@@ -108,6 +109,18 @@ export default function App() {
           </ProtectedPage>
         }
       />
+      {isDevTools && (
+        <Route
+          path="/ml-test"
+          element={
+            <ProtectedPage user={user}>
+              <MainShell>
+                <ModelTestingScreen />
+              </MainShell>
+            </ProtectedPage>
+          }
+        />
+      )}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

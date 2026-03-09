@@ -1,0 +1,327 @@
+AegisHer Frontend and Map Implementation Documentation
+Last updated: March 9, 2026
+
+1) Product Overview
+AegisHer is a React + Vite web application focused on women safety workflows:
+- User onboarding and login
+- Live map with current location
+- Risk and police insights at current coordinates
+- Route planning with shortest and safest overlays
+- Community posts feed
+- Emergency/SOS and helpline interactions
+
+The map implementation uses open-source providers:
+- Leaflet + React Leaflet for rendering
+- OpenStreetMap tiles for basemap
+- Nominatim for search/reverse geocoding
+- OSRM public routing for shortest path
+- Backend safe-routing API for risk-aware routing
+
+
+2) Frontend Tech Stack
+Primary package details from frontend/package.json:
+- React 18
+- React Router DOM 6
+- Vite 5
+- Leaflet 1.9.4
+- React Leaflet 4.2.1
+- Firebase 11 (Auth + Firestore integration)
+
+Entry point:
+- frontend/src/main.jsx
+  - Mounts BrowserRouter
+  - Imports Leaflet CSS globally
+
+
+3) Frontend Route Architecture
+File:
+- frontend/src/app.jsx
+
+Main routes:
+- /login
+- /onboarding
+- /home
+- /community
+
+Dev-only route:
+- /ml-test (available only when import.meta.env.DEV is true)
+- This route is intentionally NOT exposed in the bottom nav.
+
+Access control:
+- ProtectedPage wrapper redirects unauthenticated users to /login.
+
+Shell layout:
+- MainShell wraps protected pages
+- bottom-nav includes:
+  - Safety (/home)
+  - Community (/community)
+
+
+4) Authentication and User Profile Flow
+Files:
+- frontend/src/services/firebase.js
+- frontend/src/services/auth.js
+- frontend/src/screens/LoginScreen.jsx
+- frontend/src/screens/OnboardingScreen.jsx
+
+Authentication strategy:
+- Firebase Email/Password auth for sign up and login.
+- User profile stored in Firestore collection "Users".
+
+Registration behavior:
+1. createUserWithEmailAndPassword
+2. Build profile payload (name, phone, contacts, address)
+3. Try backend /api/auth/register with Firebase ID token
+4. If backend unavailable, fallback to direct Firestore write
+5. Persist local user session in localStorage
+
+Login behavior:
+1. signInWithEmailAndPassword
+2. Load Firestore profile
+3. Update last_login_at
+4. Persist session in localStorage
+
+Session key:
+- localStorage key: aegisher_user
+
+
+5) API Integration Layer
+File:
+- frontend/src/services/api.js
+
+Base URL:
+- VITE_API_URL (defaults to http://localhost:8000)
+
+Main API groups:
+- Risk: /api/risk/predict, /api/risk/heatmap (heatmap endpoint exists server-side)
+- Routing: /api/routes/safe, and client-side shortest route via OSRM
+- Police: /api/police/nearest
+- SOS: /api/sos/trigger
+- Community: /api/community/report, /api/community/posts
+- Chat: /api/chat/message
+
+External public services used directly in frontend:
+- Nominatim search/reverse API for place resolution
+- OSRM public route API for shortest path geometry/distance/duration
+
+
+6) Map Implementation: Core Design
+Primary map screen file:
+- frontend/src/screens/HomeScreen.jsx
+
+6.1 Map rendering
+- MapContainer from React Leaflet
+- TileLayer URL: https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
+- Current location marker
+- Optional destination marker
+- Two route polylines:
+  - Shortest: blue
+  - Safest: green
+- Accuracy circle around current location (GPS uncertainty visualization)
+
+6.2 Map recentering
+- RecenterMap component calls map.setView when coords update.
+- Keeps zoom at least 14.
+
+6.3 Map click destination picking
+- MapDestinationPicker uses useMapEvents click listener.
+- Active only when map-pick mode is enabled from RoutePanel.
+- Clicked point is reverse-geocoded for label (Nominatim reverse).
+- Fallback label is raw lat/lng text if reverse geocode fails.
+
+6.4 Route overlays
+- Route geometry is stored in HomeScreen state (routeOverlay).
+- API returns geojson coordinates as [lon, lat].
+- toLatLngPath converts each coordinate to [lat, lon] for Leaflet polylines.
+
+
+7) Location Accuracy Strategy
+In HomeScreen:
+- requestCurrentLocation():
+  - navigator.geolocation.getCurrentPosition
+  - enableHighAccuracy=true
+  - timeout=15000
+  - maximumAge=0
+- Continuous tracking:
+  - navigator.geolocation.watchPosition
+  - enableHighAccuracy=true
+  - timeout=20000
+  - maximumAge=5000
+
+Displayed to user:
+- Current lat/lng
+- Accuracy (+/- meters)
+- Last update time
+- Error text if location calls fail
+
+Insight refresh policy:
+- Risk + police are refreshed only when moved enough distance.
+- distance threshold: 120 meters (prevents API spam on small GPS jitter).
+
+
+8) Route Planning UX and Logic
+Primary file:
+- frontend/src/components/RoutePanel.jsx
+
+8.1 Input model
+- Origin is current location (read-only field).
+- Destination supports:
+  - search typing with suggestions
+  - map-click selection
+
+8.2 Place search behavior
+- Debounced lookup (~260ms delay).
+- Uses api.searchPlaces with proximity bias around origin.
+- Suggestion ranking formula in api.js:
+  - score = baseRank + distancePenalty + importanceBoost
+  - baseRank: favors earlier provider ranking
+  - distancePenalty: penalizes far-away matches
+  - importanceBoost: rewards high Nominatim importance
+
+8.3 Map pick behavior
+- "Pick destination from map" button enables one-click pick mode.
+- Once clicked on map:
+  - destination prefilled
+  - map-pick mode automatically disabled
+
+8.4 Route computation
+- On submit, route panel requests in parallel:
+  - shortest route (OSRM direct from frontend)
+  - safest route (backend /api/routes/safe)
+- Displays:
+  - shortest distance and duration
+  - safest distance and duration
+  - safety score
+  - avoided high risk zones
+
+
+9) Backend-Supported Safe Routing
+Files:
+- backend/routers/routes.py
+- backend/services/routing_engine.py
+
+Safe route endpoint:
+- POST /api/routes/safe
+
+Routing source:
+- OpenRouteService when ORS_API_KEY exists
+- OSRM fallback when ORS key is missing
+
+Safe-route scoring:
+- route_score = 0.4 * normalized_distance + 0.6 * average_risk
+- average_risk is distance-weighted across route segments
+- segment risk from RiskEngine prediction at segment midpoints
+- lower score is better
+
+Output includes:
+- geometry (GeoJSON LineString)
+- total distance and duration
+- overall safety score
+- avoided high-risk zones count
+
+
+10) UI Composition of Home Screen
+Home screen sections:
+1. Header
+   - location status
+   - helpline quick interaction (tap opens modal, long press initiates phone call)
+2. Live map
+   - current marker, destination marker, routes, accuracy radius
+3. Risk score card
+   - zone, score, AI/community breakdown
+4. Route panel (toggle-able)
+5. SOS block
+   - countdown trigger
+   - quick actions (police help, chat support)
+6. Nearest police card
+7. Floating chat button
+
+
+11) Community Screen
+File:
+- frontend/src/screens/CommunityScreen.jsx
+
+Current behavior:
+- Seed in-memory posts
+- New post composer with category tagging
+- Local like toggles
+
+Current limitation:
+- This screen is not yet connected to backend community APIs in the present implementation.
+
+
+12) Styling System
+File:
+- frontend/src/styles/global.css
+
+Highlights:
+- CSS variables for color, typography, radius, shadows.
+- Mobile-first card layout and panel styling.
+- Dedicated map and route planner classes:
+  - map-live, map-overlay-legend
+  - route-suggest-box and suggestion list styles
+  - route-map-pick button state styles
+- Dev ML screen styles included but separate from main product flow.
+
+
+13) Environment Variables
+Frontend .env:
+- VITE_API_URL
+- VITE_FIREBASE_API_KEY
+- VITE_FIREBASE_AUTH_DOMAIN
+- VITE_FIREBASE_PROJECT_ID
+- VITE_FIREBASE_STORAGE_BUCKET
+- VITE_FIREBASE_MESSAGING_SENDER_ID
+- VITE_FIREBASE_APP_ID
+- VITE_FIREBASE_MEASUREMENT_ID
+
+Backend .env (map and ML related):
+- ORS_API_KEY (optional)
+- APP_ENV (controls dev-only model endpoints)
+- RISK_MODEL_PATH
+
+
+14) Development and Run Commands
+Backend:
+- cd backend
+- uvicorn main:app --reload
+
+Frontend:
+- cd frontend
+- npm run dev
+
+Build:
+- npm run build
+
+
+15) Practical Difference vs Google Maps
+Current system approximates core map + routing workflows but is not full parity with Google Maps.
+
+Implemented:
+- Basemap rendering
+- GPS current location
+- Destination search and selection
+- Route line drawing
+- Alternative objective (safest vs shortest)
+
+Not yet implemented:
+- Turn-by-turn voice navigation
+- Real-time traffic-aware ETA
+- Lane guidance
+- Advanced rerouting on movement
+- Offline maps
+
+
+16) Known Operational Constraints
+- Public Nominatim/OSRM endpoints can rate-limit under heavy traffic.
+- OSM tile usage must respect usage policies.
+- GPS accuracy depends on user device and browser permissions.
+- Safest path quality is dependent on risk model quality and live feature realism.
+
+
+17) Suggested Next Improvements
+1. Add route step instructions panel and progress tracking along route.
+2. Add backend caching/proxy for geocoding and OSRM to improve reliability.
+3. Add community feed backend integration in CommunityScreen.
+4. Add route recalculation when user deviates from selected path.
+5. Add map tile/provider fallback strategy.

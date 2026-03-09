@@ -170,6 +170,21 @@ export const api = {
     };
   },
 
+  // Dev-only model tooling
+  riskModelStatus: () => request("/api/risk/model/status"),
+
+  trainRiskModel: () =>
+    request("/api/risk/model/train", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  testRiskModel: (payload) =>
+    request("/api/risk/model/test", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   // SOS
   triggerSOS: (userId, lat, lng, ip) =>
     request("/api/sos/trigger", {

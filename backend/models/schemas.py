@@ -40,6 +40,44 @@ class RiskResponse(BaseModel):
     label: str
 
 
+class ModelStatusResponse(BaseModel):
+    model_loaded: bool
+    model_source: str
+    model_path: str
+    feature_columns: List[str]
+
+
+class ModelTrainResponse(BaseModel):
+    status: str
+    model_path: str
+    dataset_path: str
+    samples_used: int
+    class_balance: dict
+    metrics: dict
+    feature_columns: List[str]
+
+
+class ModelTestRequest(BaseModel):
+    latitude: float
+    longitude: float
+    hour: Optional[int] = None
+    day_type: Optional[str] = None
+    lighting_score: Optional[float] = None
+    crowd_density: Optional[float] = None
+    crime_density_norm: Optional[float] = None
+    police_distance_km: Optional[float] = None
+    cctv_presence: Optional[int] = None
+    past_incident_count: Optional[int] = None
+
+
+class ModelTestResponse(BaseModel):
+    model_loaded: bool
+    model_source: str
+    predicted_risk_probability: float
+    predicted_label: str
+    contributing_factors: dict
+
+
 # ─── Routing ──────────────────────────────────────────────────────────
 class RouteRequest(BaseModel):
     origin: dict               # {latitude, longitude}

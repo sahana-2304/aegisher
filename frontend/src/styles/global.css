@@ -660,6 +660,116 @@ html, body, #root {
 .post-action-btn:hover { color: var(--accent-teal); }
 .post-action-btn.liked { color: var(--accent-coral); }
 
+/* ===== DEV ML TESTING ===== */
+.ml-test-screen {
+  min-height: calc(100vh - 65px);
+  background: var(--bg-primary);
+  padding-bottom: 20px;
+}
+.ml-card {
+  margin: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+.ml-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ml-card-header h3 {
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+}
+.ml-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.ml-btn.primary {
+  background: var(--btn-primary);
+  border-color: var(--btn-primary);
+  color: #fff;
+}
+.ml-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.ml-kv {
+  display: grid;
+  gap: 8px;
+}
+.ml-kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.ml-kv strong {
+  color: var(--text-primary);
+  text-align: right;
+}
+.ml-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ml-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ml-field span {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+.ml-field input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 9px 10px;
+  font-size: 0.8rem;
+}
+.ml-result {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.ml-json {
+  margin-top: 10px;
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  padding: 10px;
+  font-size: 0.72rem;
+  max-height: 220px;
+  overflow: auto;
+}
+.ml-muted {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.ml-error {
+  margin: 0 16px;
+  color: var(--accent-coral);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 700px) {
+  .ml-grid { grid-template-columns: 1fr; }
+}
+
 /* ===== SECTION HEADER ===== */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin: 16px 16px 8px; }
 .section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-secondary); font-weight: 500; }
