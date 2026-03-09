@@ -1,9 +1,9 @@
 """
-Firebase Service — Firestore + FCM
+Firebase Service - Firestore + FCM
 """
-import os
 import json
-from typing import Optional
+import os
+from pathlib import Path
 
 _db = None
 _fcm_app = None
@@ -22,7 +22,10 @@ def init_firebase():
         if cred_json:
             cred = credentials.Certificate(json.loads(cred_json))
         elif cred_path:
-            cred = credentials.Certificate(cred_path)
+            resolved_path = Path(cred_path)
+            if not resolved_path.is_absolute():
+                resolved_path = Path(__file__).resolve().parents[1] / resolved_path
+            cred = credentials.Certificate(str(resolved_path))
         else:
             print("[Firebase] No credentials found. Running without Firebase.")
             return
@@ -38,7 +41,7 @@ def init_firebase():
 
 def get_firestore():
     if _db is None:
-        raise RuntimeError("Firestore not initialized. Check FIREBASE_CREDENTIALS_JSON env var.")
+        raise RuntimeError("Firestore not initialized. Set FIREBASE_CREDENTIALS_JSON or FIREBASE_CREDENTIALS_PATH.")
     return _db
 
 
@@ -46,6 +49,7 @@ async def send_fcm_notification(token: str, title: str, body: str, data: dict = 
     """Send a push notification via Firebase Cloud Messaging."""
     try:
         from firebase_admin import messaging
+
         message = messaging.Message(
             notification=messaging.Notification(title=title, body=body),
             data={str(k): str(v) for k, v in (data or {}).items()},
