@@ -692,27 +692,30 @@ export default function CommunityScreen({ user }) {
         </div>
 
         <div className="cs-stories">
-          <button type="button" className="cs-story-item" onClick={openOwnStoryEntry}>
-            <span className={`cs-story-avatar own ${ownStoryGroup?.hasUnseen ? "" : "seen"}`}>
-              {user?.photoUrl ? (
-                <img src={user.photoUrl} alt="Your story" className="cs-story-image" />
-              ) : (
-                <span className="cs-story-emoji">{getNameInitial(user?.name, "Y")}</span>
-              )}
-              <button
-                type="button"
-                className="cs-story-plus-btn"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  resetStoryComposerState();
-                  setShowStoryComposer(true);
-                }}
-              >
-                <Plus size={11} />
-              </button>
-            </span>
-            <span className="cs-story-name">Your Story</span>
-          </button>
+          <div className="cs-story-item cs-story-item-own">
+            <button type="button" className="cs-story-main-btn" onClick={openOwnStoryEntry}>
+              <span className={`cs-story-avatar own ${ownStoryGroup?.hasUnseen ? "" : "seen"}`}>
+                {user?.photoUrl ? (
+                  <img src={user.photoUrl} alt="Your story" className="cs-story-image" />
+                ) : (
+                  <span className="cs-story-emoji">{getNameInitial(user?.name, "Y")}</span>
+                )}
+              </span>
+              <span className="cs-story-name">Your Story</span>
+            </button>
+            <button
+              type="button"
+              className="cs-story-plus-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                resetStoryComposerState();
+                setShowStoryComposer(true);
+              }}
+              aria-label="Add story"
+            >
+              <Plus size={11} />
+            </button>
+          </div>
 
           {orderedStoryGroups
             .filter((group) => !group.isOwn)

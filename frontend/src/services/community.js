@@ -27,6 +27,55 @@ export const MAX_POST_IMAGES = 5;
 const MAX_POST_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_STORY_IMAGE_SIZE_BYTES = 6 * 1024 * 1024;
+const STORAGE_DISABLED_KEY = "aegisher_community_storage_upload_disabled";
+const COMMUNITY_MEDIA_UPLOAD_MODE = String(import.meta.env.VITE_COMMUNITY_MEDIA_UPLOAD_MODE || "auto").toLowerCase();
+
+function shouldSkipStorageUpload() {
+  if (COMMUNITY_MEDIA_UPLOAD_MODE === "firestore") return true;
+  if (typeof window === "undefined") return false;
+  if (COMMUNITY_MEDIA_UPLOAD_MODE !== "storage" && import.meta.env.DEV) return true;
+  return window.sessionStorage.getItem(STORAGE_DISABLED_KEY) === "1";
+}
+
+function markStorageUploadFailed() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(STORAGE_DISABLED_KEY, "1");
+}
+
+function loadImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not decode the selected image."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageToDataUrl(file, options = {}) {
+  const image = await loadImageFile(file);
+  const maxDimension = Math.max(120, Number(options.maxDimension || 720));
+  const quality = Math.min(0.92, Math.max(0.5, Number(options.quality || 0.78)));
+  const longestSide = Math.max(image.width, image.height) || 1;
+  const scale = Math.min(1, maxDimension / longestSide);
+
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not process this image.");
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
 
 function deriveBucketFallbacks() {
   const configuredBucket = (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "").trim();
@@ -226,6 +275,22 @@ async function uploadStoryImageToStorage(uid, file) {
   throw lastError || new Error("Story upload failed.");
 }
 
+async function buildInlineMediaEntries(files) {
+  return Promise.all(
+    files.map(async (file, index) => {
+      const dataUrl = await compressImageToDataUrl(file, { maxDimension: 640, quality: 0.72 });
+      return {
+        id: `${Date.now()}-${index}`,
+        url: dataUrl,
+        source: "firestore_inline",
+        mime_type: "image/jpeg",
+        size_bytes: Number(file.size || 0),
+        order: index,
+      };
+    }),
+  );
+}
+
 async function preparePostMedia(uid, imageFiles) {
   const files = Array.isArray(imageFiles) ? imageFiles : [];
   if (!files.length) return [];
@@ -234,10 +299,19 @@ async function preparePostMedia(uid, imageFiles) {
   }
 
   files.forEach(validateImageFile);
+  if (shouldSkipStorageUpload()) {
+    return buildInlineMediaEntries(files);
+  }
+
   try {
     return await Promise.all(files.map((file, index) => uploadPostImageToStorage(uid, file, index)));
   } catch {
-    throw new Error("Could not upload images. Please check Firebase Storage/CORS rules and try again.");
+    markStorageUploadFailed();
+    try {
+      return await buildInlineMediaEntries(files);
+    } catch {
+      throw new Error("Could not process images for upload.");
+    }
   }
 }
 
@@ -357,6 +431,7 @@ export async function createCommunityStory({ user, text, imageFile }) {
   }
 
   let mediaUrl = "";
+  let mediaSource = "";
   if (imageFile) {
     if (!imageFile.type?.startsWith("image/")) {
       throw new Error("Only image files are supported.");
@@ -364,10 +439,23 @@ export async function createCommunityStory({ user, text, imageFile }) {
     if (imageFile.size > MAX_STORY_IMAGE_SIZE_BYTES) {
       throw new Error("Story image must be 6 MB or smaller.");
     }
-    try {
-      mediaUrl = await uploadStoryImageToStorage(uid, imageFile);
-    } catch {
-      throw new Error("Could not upload story image. Check Firebase Storage/CORS and retry.");
+
+    if (!shouldSkipStorageUpload()) {
+      try {
+        mediaUrl = await uploadStoryImageToStorage(uid, imageFile);
+        mediaSource = "storage";
+      } catch {
+        markStorageUploadFailed();
+      }
+    }
+
+    if (!mediaUrl) {
+      try {
+        mediaUrl = await compressImageToDataUrl(imageFile, { maxDimension: 720, quality: 0.8 });
+        mediaSource = "firestore_inline";
+      } catch {
+        throw new Error("Could not process story image.");
+      }
     }
   }
 
@@ -378,7 +466,7 @@ export async function createCommunityStory({ user, text, imageFile }) {
     user_avatar: user?.photoUrl || "👤",
     text: normalizedText,
     media_url: mediaUrl,
-    media_source: mediaUrl ? "storage" : "",
+    media_source: mediaSource,
     seen_by: [uid],
     viewers_count: 0,
     created_at: serverTimestamp(),

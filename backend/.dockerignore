@@ -1,0 +1,27 @@
+.git
+.gitignore
+.vscode
+.idea
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.tmp
+
+# Local env/secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+
+# Build and cache artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
