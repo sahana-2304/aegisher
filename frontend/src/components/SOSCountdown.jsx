@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../services/api";
 
 const RADIUS = 54;
@@ -11,15 +11,16 @@ export default function SOSCountdown({ user, coords, onComplete, onCancel }) {
   useEffect(() => {
     if (count === 0) {
       setSent(true);
-      // In production: get real device IP
-      api.triggerSOS(user?.id, coords.lat, coords.lng, "0.0.0.0")
+      api
+        .triggerSOS(user?.user_id || user?.id, coords.lat, coords.lng, "0.0.0.0")
         .then(() => setTimeout(onComplete, 1500))
         .catch(() => setTimeout(onComplete, 1500));
       return;
     }
-    const t = setTimeout(() => setCount(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [count]);
+
+    const timer = setTimeout(() => setCount((current) => current - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [count, coords.lat, coords.lng, onComplete, user?.id, user?.user_id]);
 
   const progress = (count / 3) * CIRCUMFERENCE;
 
@@ -30,26 +31,43 @@ export default function SOSCountdown({ user, coords, onComplete, onCancel }) {
           <circle className="bg" cx="80" cy="80" r={RADIUS} />
           <circle
             className="progress"
-            cx="80" cy="80" r={RADIUS}
+            cx="80"
+            cy="80"
+            r={RADIUS}
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={CIRCUMFERENCE - progress}
           />
         </svg>
-        {sent
-          ? <span style={{ fontSize: "2rem", zIndex: 1 }}>✓</span>
-          : <span className="countdown-number">{count}</span>
-        }
+        {sent ? (
+          <span style={{ fontSize: "1.2rem", zIndex: 1, letterSpacing: 1 }}>OK</span>
+        ) : (
+          <span className="countdown-number">{count}</span>
+        )}
       </div>
+
       <div style={{ textAlign: "center" }}>
-        <p className="countdown-label" style={{ color: "var(--accent-coral)", fontSize: "1rem", fontFamily: "var(--font-display)", letterSpacing: 3 }}>
-          {sent ? "SOS SENT" : "SENDING SOS"}
+        <p
+          className="countdown-label"
+          style={{
+            color: "var(--accent-coral)",
+            fontSize: "1rem",
+            fontFamily: "var(--font-display)",
+            letterSpacing: 3,
+          }}
+        >
+          {sent ? "MOCK SOS SENT" : "SENDING MOCK SOS"}
         </p>
         <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: 8 }}>
-          {sent ? "Emergency contacts & police notified" : "Alerting emergency contacts & police..."}
+          {sent
+            ? "Simulated alert completed successfully."
+            : "Simulating emergency contacts and police alert..."}
         </p>
       </div>
+
       {!sent && (
-        <button className="countdown-cancel" onClick={onCancel}>CANCEL SOS</button>
+        <button className="countdown-cancel" onClick={onCancel}>
+          CANCEL SOS
+        </button>
       )}
     </div>
   );

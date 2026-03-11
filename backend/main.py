@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from dotenv import load_dotenv
 
-from routers import risk, routes, sos, community, police, auth, chat
+from routers import risk, routes, sos, community, police, auth, chat, nearby
 from services.firebase import init_firebase
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -43,6 +43,7 @@ app.include_router(routes.router, prefix="/api/routes", tags=["Safe Routing"])
 app.include_router(sos.router, prefix="/api/sos", tags=["Emergency SOS"])
 app.include_router(community.router, prefix="/api/community", tags=["Community"])
 app.include_router(police.router, prefix="/api/police", tags=["Police Assistance"])
+app.include_router(nearby.router, prefix="/api/nearby", tags=["Nearby Services"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Helpline Chat"])
 
 

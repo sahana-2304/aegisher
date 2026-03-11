@@ -2,12 +2,67 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
 const OSRM_BASE = "https://router.project-osrm.org/route/v1";
+const BACKEND_RETRY_COOLDOWN_MS = Number(import.meta.env.VITE_BACKEND_RETRY_COOLDOWN_MS || 15000);
+const MOCK_SOS_STORAGE_KEY = "aegisher_mock_sos_events";
+
+let backendRetryAfterMs = 0;
+let backendCachedError = "";
 
 const OSRM_MODE = {
   walking: "walking",
   driving: "driving",
   cycling: "cycling",
 };
+
+function isLoopbackBackend(baseUrl) {
+  try {
+    const parsed = new URL(baseUrl);
+    const host = String(parsed.hostname || "").toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function buildBackendOfflineMessage(error) {
+  const suffix = isLoopbackBackend(BASE_URL)
+    ? ` Start the backend server at ${BASE_URL} (for example: uvicorn main:app --reload --port 8000).`
+    : "";
+  return `Backend API is unavailable.${suffix}`.trim() || error?.message || "Backend API is unavailable.";
+}
+
+function persistMockSosEvent(event) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(MOCK_SOS_STORAGE_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    const existing = Array.isArray(parsed) ? parsed : [];
+    const next = [event, ...existing].slice(0, 50);
+    window.localStorage.setItem(MOCK_SOS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore persistence failures for mock-only flows.
+  }
+}
+
+async function triggerMockSOS(userId, lat, lng, ip) {
+  const timestamp = new Date().toISOString();
+  const sosId = `mock-sos-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const event = {
+    sos_id: sosId,
+    user_id: userId || "unknown",
+    latitude: Number(lat),
+    longitude: Number(lng),
+    device_ip: ip || "0.0.0.0",
+    status: "mock_dispatched",
+    contacts_notified: 2,
+    police_notified: true,
+    timestamp,
+  };
+
+  persistMockSosEvent(event);
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  return event;
+}
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -55,11 +110,39 @@ function toRankedPlaces(items, options = {}) {
 }
 
 async function request(path, opts = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    ...opts,
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const now = Date.now();
+  if (backendRetryAfterMs && now < backendRetryAfterMs) {
+    throw new Error(backendCachedError || "Backend API is unavailable.");
+  }
+
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json", ...opts.headers },
+      ...opts,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw error;
+    }
+    backendRetryAfterMs = Date.now() + BACKEND_RETRY_COOLDOWN_MS;
+    backendCachedError = buildBackendOfflineMessage(error);
+    throw new Error(backendCachedError);
+  }
+
+  if (!res.ok) {
+    let detail = `API error ${res.status}`;
+    try {
+      const payload = await res.json();
+      if (payload?.detail) detail = String(payload.detail);
+    } catch {
+      // Keep fallback detail text.
+    }
+    throw new Error(detail);
+  }
+
+  backendRetryAfterMs = 0;
+  backendCachedError = "";
   return res.json();
 }
 
@@ -186,21 +269,38 @@ export const api = {
     }),
 
   // SOS
-  triggerSOS: (userId, lat, lng, ip) =>
-    request("/api/sos/trigger", {
-      method: "POST",
-      body: JSON.stringify({ user_id: userId, latitude: lat, longitude: lng, device_ip: ip, timestamp: new Date().toISOString() }),
-    }),
+  triggerSOS: (userId, lat, lng, ip) => triggerMockSOS(userId, lat, lng, ip),
 
   // Police
   nearestPolice: (lat, lng) =>
     request(`/api/police/nearest?lat=${lat}&lng=${lng}`),
+
+  getNearbyServices: (lat, lng, options = {}) => {
+    const radiusM = Math.max(500, Math.min(Number(options.radiusM || 3000), 10000));
+    const limit = Math.max(1, Math.min(Number(options.limit || 10), 30));
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lng: String(lng),
+      radius_m: String(radiusM),
+      limit: String(limit),
+    });
+    return request(`/api/nearby/services?${params.toString()}`, {
+      signal: options.signal,
+    });
+  },
 
   // Community
   submitReport: (data) =>
     request("/api/community/report", { method: "POST", body: JSON.stringify(data) }),
 
   getPosts: () => request("/api/community/posts"),
+  exportCommunityModelRows: ({ startIso, endIso, limit = 500 } = {}) => {
+    const params = new URLSearchParams();
+    if (startIso) params.set("start_iso", String(startIso));
+    if (endIso) params.set("end_iso", String(endIso));
+    if (limit != null) params.set("limit", String(limit));
+    return request(`/api/community/model/export?${params.toString()}`);
+  },
 
   // Route feedback
   submitFeedback: (data) =>

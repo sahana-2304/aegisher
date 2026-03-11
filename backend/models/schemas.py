@@ -156,6 +156,39 @@ class PoliceStation(BaseModel):
 
 
 # ─── Chat ─────────────────────────────────────────────────────────────
+# Nearby services
+class NearbyServicePoint(BaseModel):
+    id: str
+    name: str
+    address: str
+    phone: str
+    latitude: float
+    longitude: float
+    distance_m: float
+    source: str
+
+
+class HelplineContact(BaseModel):
+    id: str
+    name: str
+    number: str
+    type: str
+
+
+class NearbyMeta(BaseModel):
+    fetched_at: str
+    used_fallback_police: bool
+    used_fallback_hospitals: bool
+
+
+class NearbyServicesResponse(BaseModel):
+    police: List[NearbyServicePoint]
+    hospitals: List[NearbyServicePoint]
+    helplines: List[HelplineContact]
+    meta: NearbyMeta
+
+
+# Chat
 class ChatMessage(BaseModel):
     message: str
     session_id: str

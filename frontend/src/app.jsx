@@ -4,9 +4,12 @@ import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom"
 import CommunityScreen from "./screens/CommunityScreen";
 import HomeScreen from "./screens/HomeScreen";
 import LoginScreen from "./screens/LoginScreen";
+import MapScreen from "./screens/MapScreen";
 import ModelTestingScreen from "./screens/ModelTestingScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
-import { getUser } from "./services/auth";
+import PostDetailScreen from "./screens/PostDetailScreen";
+import ProfileScreen from "./screens/ProfileScreen";
+import { getUser, logoutUser } from "./services/auth";
 import "./styles/global.css";
 
 function SplashScreen() {
@@ -53,8 +56,14 @@ function MainShell({ children }) {
         <NavLink to="/home" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">S</span><span className="nav-label">Safety</span>
         </NavLink>
+        <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <span className="nav-icon">M</span><span className="nav-label">Map</span>
+        </NavLink>
         <NavLink to="/community" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">C</span><span className="nav-label">Community</span>
+        </NavLink>
+        <NavLink to="/profile" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <span className="nav-icon">P</span><span className="nav-label">Profile</span>
         </NavLink>
       </nav>
     </div>
@@ -75,6 +84,11 @@ export default function App() {
     setUser(getUser());
     setLoading(false);
   }, []);
+
+  async function handleLogout() {
+    await logoutUser();
+    setUser(null);
+  }
 
   if (loading) return <SplashScreen />;
 
@@ -100,11 +114,39 @@ export default function App() {
         }
       />
       <Route
+        path="/map"
+        element={
+          <ProtectedPage user={user}>
+            <MainShell>
+              <MapScreen user={user} />
+            </MainShell>
+          </ProtectedPage>
+        }
+      />
+      <Route
         path="/community"
         element={
           <ProtectedPage user={user}>
             <MainShell>
               <CommunityScreen user={user} />
+            </MainShell>
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/community/post/:postId"
+        element={
+          <ProtectedPage user={user}>
+            <PostDetailScreen user={user} />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedPage user={user}>
+            <MainShell>
+              <ProfileScreen user={user} onLogout={handleLogout} onUserUpdate={setUser} />
             </MainShell>
           </ProtectedPage>
         }

@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,7 +16,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = import.meta.env.DEV
+  ? initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      useFetchStreams: false,
+    })
+  : getFirestore(app);
+const storage = getStorage(app);
 
 if (typeof window !== "undefined") {
   isSupported()
@@ -25,4 +32,4 @@ if (typeof window !== "undefined") {
     .catch(() => {});
 }
 
-export { app, auth, db };
+export { app, auth, db, storage };

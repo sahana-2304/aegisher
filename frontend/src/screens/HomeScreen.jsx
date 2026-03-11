@@ -1,20 +1,66 @@
-import { useState, useEffect, useRef } from "react";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  Polyline,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import L from "leaflet";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import {
+  AlertTriangle,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  Heart,
+  Info,
+  LocateFixed,
+  MapPin,
+  MessageCircle,
+  Minus,
+  Phone,
+  PhoneCall,
+  Plus,
+  Route as RouteIcon,
+  Shield,
+  ShieldAlert,
+  Users,
+  X,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import HelplineModal from "../components/HelplineModal";
 import SOSCountdown from "../components/SOSCountdown";
 import ChatPanel from "../components/ChatPanel";
 import RoutePanel from "../components/RoutePanel";
 import { api } from "../services/api";
+import "./HomeScreen.css";
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
+const markerBase = import.meta.env.BASE_URL || "/";
+const currentLocationMarkerIcon = new L.Icon({
+  iconUrl: `${markerBase}marker1.png`,
+  iconRetinaUrl: `${markerBase}marker1.png`,
+  iconSize: [40, 46],
+  iconAnchor: [20, 44],
+  popupAnchor: [0, -38],
   shadowUrl: markerShadow,
+  shadowSize: [41, 41],
+  shadowAnchor: [13, 41],
+});
+
+const destinationMarkerIcon = new L.Icon({
+  iconUrl: `${markerBase}marker2.png`,
+  iconRetinaUrl: `${markerBase}marker2.png`,
+  iconSize: [40, 46],
+  iconAnchor: [20, 44],
+  popupAnchor: [0, -38],
+  shadowUrl: markerShadow,
+  shadowSize: [41, 41],
+  shadowAnchor: [13, 41],
 });
 
 const DEFAULT_RISK = {
@@ -49,6 +95,32 @@ function MapDestinationPicker({ enabled, onPick }) {
   return null;
 }
 
+function MapZoomControls({ onLocate }) {
+  const map = useMap();
+
+  function run(handler) {
+    return (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handler();
+    };
+  }
+
+  return (
+    <div className="hs-map-controls">
+      <button type="button" className="hs-map-control-btn" onClick={run(() => onLocate?.())}>
+        <LocateFixed size={18} />
+      </button>
+      <button type="button" className="hs-map-control-btn" onClick={run(() => map.zoomIn())}>
+        <Plus size={18} />
+      </button>
+      <button type="button" className="hs-map-control-btn" onClick={run(() => map.zoomOut())}>
+        <Minus size={18} />
+      </button>
+    </div>
+  );
+}
+
 function toLatLngPath(coords) {
   if (!Array.isArray(coords)) return [];
   return coords
@@ -69,10 +141,12 @@ function distanceMeters(a, b) {
 }
 
 export default function HomeScreen({ user }) {
+  const navigate = useNavigate();
   const [showHelpline, setShowHelpline] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showRoute, setShowRoute] = useState(false);
+  const [showRiskDetails, setShowRiskDetails] = useState(true);
   const [helplineHighlight, setHelplineHighlight] = useState(false);
   const [coords, setCoords] = useState({ lat: 13.0827, lng: 80.2707 });
   const [locationConfirmed, setLocationConfirmed] = useState(false);
@@ -83,17 +157,24 @@ export default function HomeScreen({ user }) {
   const [policeData, setPoliceData] = useState(DEFAULT_POLICE);
   const [routeOverlay, setRouteOverlay] = useState(null);
   const [mapPickEnabled, setMapPickEnabled] = useState(false);
+  const [clockText, setClockText] = useState(() =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  );
 
   const longPressRef = useRef(null);
   const watchIdRef = useRef(null);
   const lastInsightCoordsRef = useRef(null);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setClockText(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   async function refreshLocationInsights(lat, lng) {
     try {
-      const [risk, police] = await Promise.all([
-        api.predictRisk(lat, lng),
-        api.nearestPolice(lat, lng),
-      ]);
+      const [risk, police] = await Promise.all([api.predictRisk(lat, lng), api.nearestPolice(lat, lng)]);
 
       if (risk) setRiskData(risk);
       if (police) setPoliceData(police);
@@ -134,7 +215,7 @@ export default function HomeScreen({ user }) {
         enableHighAccuracy: true,
         timeout: 15000,
         maximumAge: 0,
-      }
+      },
     );
   }
 
@@ -153,7 +234,7 @@ export default function HomeScreen({ user }) {
         enableHighAccuracy: true,
         timeout: 20000,
         maximumAge: 5000,
-      }
+      },
     );
 
     return () => {
@@ -168,7 +249,7 @@ export default function HomeScreen({ user }) {
     setShowSOS(false);
     setHelplineHighlight(true);
     setTimeout(() => setHelplineHighlight(false), 8000);
-    alert("SOS Sent! Emergency contacts and police notified. Tap the phone button for direct helpline.");
+    alert("Mock SOS sent. This is a simulated alert flow.");
   }
 
   function handleHelplineLongPress() {
@@ -176,6 +257,10 @@ export default function HomeScreen({ user }) {
     longPressRef.current = setTimeout(() => {
       window.location.href = "tel:112";
     }, 600);
+  }
+
+  function clearHelplineLongPress() {
+    clearTimeout(longPressRef.current);
   }
 
   function previewDestination(next) {
@@ -214,230 +299,301 @@ export default function HomeScreen({ user }) {
   const aiScore = Number(riskData?.ai_score ?? DEFAULT_RISK.ai_score);
   const communityScore = Number(riskData?.community_score ?? DEFAULT_RISK.community_score);
 
-  const riskColor = riskScore < 35 ? "var(--accent-teal)" : riskScore < 65 ? "var(--accent-amber)" : "var(--accent-coral)";
+  const riskColor = riskScore < 35 ? "#10b981" : riskScore < 65 ? "#f59e0b" : "#ef4444";
   const riskClass = riskScore < 35 ? "low" : riskScore < 65 ? "med" : "high";
+  const boundedRiskScore = Math.max(0, Math.min(100, riskScore));
+  const riskCircumference = 2 * Math.PI * 26;
+  const riskStroke = (boundedRiskScore / 100) * riskCircumference;
 
   const shortestPath = toLatLngPath(routeOverlay?.shortest || []);
   const safestPath = toLatLngPath(routeOverlay?.safest || []);
   const destination = routeOverlay?.destination;
   const accuracyRadiusM = locationAccuracyM == null ? null : Math.max(18, Math.min(locationAccuracyM, 250));
-  const gpsStatusText = locationConfirmed
-    ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}${locationAccuracyM != null ? ` (+/-${locationAccuracyM}m)` : ""}`
-    : "Fetching location...";
-  const gpsTimestampText = locationUpdatedAt
-    ? `Updated ${new Date(locationUpdatedAt).toLocaleTimeString()}`
-    : "";
-
   const policeDistanceKm = Number(policeData?.distance_m || 0) / 1000;
 
   return (
-    <div className="home-screen">
-      {/* Header */}
-      <div className="home-header">
-        <div className="header-left">
-          <h2>SAFE ZONE</h2>
-          <p style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: locationConfirmed ? "var(--accent-teal)" : "var(--text-muted)", display: "inline-block" }} />
-            {gpsStatusText}
-          </p>
-          {gpsTimestampText && (
-            <p style={{ marginTop: 2, fontSize: "0.72rem", color: "var(--text-muted)" }}>{gpsTimestampText}</p>
-          )}
-          {locationError && (
-            <p style={{ marginTop: 2, fontSize: "0.72rem", color: "var(--accent-coral)" }}>{locationError}</p>
-          )}
+    <div className="hs-mobile-screen">
+      <div className="hs-status-bar">
+        <div className="hs-status-left">
+          <span className={`hs-location-dot ${locationConfirmed ? "active" : ""}`} />
+          <span>{locationConfirmed ? "GPS Active" : "Acquiring GPS..."}</span>
         </div>
-        <button
-          className={`helpline-btn ${helplineHighlight ? "highlight" : ""}`}
-          onMouseDown={handleHelplineLongPress}
-          onMouseUp={() => clearTimeout(longPressRef.current)}
-          onTouchStart={handleHelplineLongPress}
-          onTouchEnd={() => clearTimeout(longPressRef.current)}
-          onClick={() => {
-            clearTimeout(longPressRef.current);
-            setShowHelpline(true);
-          }}
-          title="Press to see contacts | Hold for direct call"
-        >
-          ??
-        </button>
+        <div className="hs-status-right">
+          <Bell size={14} />
+          <span>{clockText}</span>
+        </div>
       </div>
 
-      {/* Map */}
-      <div className="map-section" style={{ margin: "16px 16px 0" }}>
-        <div className="map-container map-live-wrap">
-          <MapContainer center={[coords.lat, coords.lng]} zoom={14} className="map-live" scrollWheelZoom>
+      <header className="hs-main-header">
+        <div className="hs-brand">
+          <Shield size={20} />
+          <div>
+            <h1>SafeZone</h1>
+            <p>{locationUpdatedAt ? `Updated ${new Date(locationUpdatedAt).toLocaleTimeString()}` : "Awaiting GPS fix"}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`hs-icon-btn ${helplineHighlight ? "pulse" : ""}`}
+          onMouseDown={handleHelplineLongPress}
+          onMouseUp={clearHelplineLongPress}
+          onMouseLeave={clearHelplineLongPress}
+          onTouchStart={handleHelplineLongPress}
+          onTouchEnd={clearHelplineLongPress}
+          onTouchCancel={clearHelplineLongPress}
+          onClick={() => {
+            clearHelplineLongPress();
+            setShowHelpline(true);
+          }}
+          title="Press to view helpline contacts. Hold to call 112."
+        >
+          <PhoneCall size={18} />
+        </button>
+      </header>
+
+      <button type="button" className="hs-location-bar" onClick={() => setShowRiskDetails((prev) => !prev)}>
+        <div className="hs-location-main">
+          <MapPin size={16} />
+          <div className="hs-location-copy">
+            <span>{locationConfirmed ? `${coords.lat.toFixed(4)} N, ${coords.lng.toFixed(4)} E` : "Fetching location..."}</span>
+            {locationAccuracyM != null && <small>+/-{locationAccuracyM}m accuracy</small>}
+          </div>
+        </div>
+        <ChevronDown size={18} className={showRiskDetails ? "open" : ""} />
+      </button>
+
+      {locationError && <div className="hs-location-error">{locationError}</div>}
+
+      {showRiskDetails && (
+        <section className="hs-risk-card">
+          <div className="hs-risk-head">
+            <div className="hs-risk-title">
+              <ShieldAlert size={16} />
+              <span>Area Risk Assessment</span>
+            </div>
+            <span className={`hs-risk-badge ${riskClass}`}>{riskZone}</span>
+          </div>
+          <div className="hs-risk-body">
+            <div className="hs-risk-score">
+              <span style={{ color: riskColor }}>{riskScore.toFixed(0)}</span>
+              <small>Risk Score</small>
+            </div>
+            <div className="hs-risk-ring">
+              <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true">
+                <circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" />
+                <circle
+                  cx="30"
+                  cy="30"
+                  r="26"
+                  fill="none"
+                  stroke={riskColor}
+                  strokeWidth="4"
+                  strokeDasharray={`${riskStroke} ${riskCircumference}`}
+                  transform="rotate(-90 30 30)"
+                />
+              </svg>
+            </div>
+          </div>
+          <div className="hs-risk-metrics">
+            <div className="hs-risk-metric">
+              <Users size={14} />
+              <div>
+                <span>Community</span>
+                <strong>{(communityScore * 100).toFixed(0)}%</strong>
+              </div>
+            </div>
+            <div className="hs-risk-metric">
+              <Heart size={14} />
+              <div>
+                <span>AI Model</span>
+                <strong>{(aiScore * 100).toFixed(0)}%</strong>
+              </div>
+            </div>
+          </div>
+          <div className="hs-risk-foot">
+            <Info size={14} />
+            <span>{riskLabel}</span>
+          </div>
+        </section>
+      )}
+
+      <section className="hs-map-section">
+        <div className="hs-map-wrapper">
+          <MapContainer
+            center={[coords.lat, coords.lng]}
+            zoom={14}
+            className="hs-mobile-map"
+            zoomControl={false}
+            attributionControl={false}
+            scrollWheelZoom
+          >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <RecenterMap coords={coords} />
             <MapDestinationPicker enabled={mapPickEnabled} onPick={handleMapDestinationPick} />
+            <MapZoomControls onLocate={() => requestCurrentLocation(true)} />
 
-            <Marker position={[coords.lat, coords.lng]}>
-              <Tooltip direction="top" offset={[0, -8]} permanent={false}>Current Location</Tooltip>
+            <Marker position={[coords.lat, coords.lng]} icon={currentLocationMarkerIcon}>
+              <Tooltip direction="top" offset={[0, -8]}>
+                Current location
+              </Tooltip>
             </Marker>
+
             {accuracyRadiusM != null && (
               <Circle
                 center={[coords.lat, coords.lng]}
                 radius={accuracyRadiusM}
                 pathOptions={{
-                  color: "#2563eb",
+                  color: "#3b82f6",
                   fillColor: "#3b82f6",
-                  fillOpacity: 0.18,
+                  fillOpacity: 0.12,
                   weight: 1,
                 }}
               />
             )}
 
             {destination && (
-              <Marker position={[destination.lat, destination.lng]}>
-                <Tooltip direction="top" offset={[0, -8]} permanent={false}>Destination</Tooltip>
+              <Marker position={[destination.lat, destination.lng]} icon={destinationMarkerIcon}>
+                <Tooltip direction="top" offset={[0, -8]}>
+                  Destination
+                </Tooltip>
               </Marker>
             )}
 
             {shortestPath.length > 1 && (
-              <Polyline positions={shortestPath} pathOptions={{ color: "#3b82f6", weight: 5, opacity: 0.75 }} />
+              <Polyline positions={shortestPath} pathOptions={{ color: "#3b82f6", weight: 4, opacity: 0.8 }} />
             )}
             {safestPath.length > 1 && (
-              <Polyline positions={safestPath} pathOptions={{ color: "#16a34a", weight: 6, opacity: 0.9 }} />
+              <Polyline positions={safestPath} pathOptions={{ color: "#10b981", weight: 5, opacity: 0.92 }} />
             )}
           </MapContainer>
 
-          <div className="map-overlay-legend">
-            <div className="legend-chip"><span className="line shortest" />Shortest</div>
-            <div className="legend-chip"><span className="line safest" />Safest</div>
-            {locationAccuracyM != null && (
-              <div className="legend-chip"><span className="line gps" />GPS +/-{locationAccuracyM}m</div>
-            )}
-            {mapPickEnabled && (
-              <div className="legend-chip">Tap map to pick destination</div>
-            )}
+          <div className="hs-map-legend">
+            <span className="hs-legend-chip">
+              <span className="hs-legend-dot shortest" />
+              Shortest
+            </span>
+            <span className="hs-legend-chip">
+              <span className="hs-legend-dot safest" />
+              Safest
+            </span>
+            {mapPickEnabled && <span className="hs-legend-chip">Tap map to pick destination</span>}
           </div>
         </div>
 
-        <div className="risk-legend">
-          <div className="legend-item"><div className="legend-dot high" /><span className="legend-label">High Risk</span></div>
-          <div className="legend-item"><div className="legend-dot med" /><span className="legend-label">Moderate</span></div>
-          <div className="legend-item"><div className="legend-dot low" /><span className="legend-label">Safe Zone</span></div>
-        </div>
-        <div className="map-actions">
-          <button className="map-btn" onClick={() => requestCurrentLocation(true)}>
-            <span className="btn-icon">?</span> Use High-Accuracy GPS
+        <div className="hs-quick-actions">
+          <button type="button" className={`hs-action-btn ${showRoute ? "active" : ""}`} onClick={() => setShowRoute((prev) => !prev)}>
+            <RouteIcon size={18} />
+            <span>Route</span>
           </button>
-          <button className={`map-btn ${showRoute ? "active" : ""}`} onClick={() => setShowRoute(!showRoute)}>
-            <span className="btn-icon">?</span> Plan Route
+          <button type="button" className="hs-action-btn" onClick={() => setShowChat(true)}>
+            <MessageCircle size={18} />
+            <span>Chat</span>
+          </button>
+          <button type="button" className="hs-action-btn danger" onClick={() => setShowSOS(true)}>
+            <AlertTriangle size={18} />
+            <span>SOS</span>
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Risk Score Card */}
-      <div style={{ margin: "12px 16px 0" }}>
-        <div className="risk-card">
-          <div className="risk-card-header">
-            <span className="risk-card-title">Current Area Risk Score</span>
-            <span className={`risk-badge ${riskClass}`}>{riskZone}</span>
-          </div>
-          <div className="risk-score-display">
-            <span className="risk-number" style={{ color: riskColor }}>{riskScore.toFixed(1)}</span>
-            <span className="risk-max">/100</span>
-          </div>
-          <div className="risk-breakdown">
-            <div className="breakdown-item">
-              <span className="breakdown-label">AI Model</span>
-              <span className="breakdown-value">{(aiScore * 100).toFixed(0)}%</span>
-            </div>
-            <div className="breakdown-item">
-              <span className="breakdown-label">Community</span>
-              <span className="breakdown-value">{(communityScore * 100).toFixed(0)}%</span>
-            </div>
-            <div className="breakdown-item">
-              <span className="breakdown-label">Status</span>
-              <span className="breakdown-value" style={{ color: riskColor }}>{riskLabel}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Route Panel */}
       {showRoute && (
-        <RoutePanel
-          origin={coords}
-          onRoutesUpdate={(next) => {
-            setMapPickEnabled(false);
-            setRouteOverlay(next);
-          }}
-          onEnableMapPick={() => {
-            setShowRoute(true);
-            setMapPickEnabled(true);
-          }}
-          mapPickEnabled={mapPickEnabled}
-          pickedDestination={routeOverlay?.destination || null}
-          onDestinationPreview={previewDestination}
+        <section className="hs-route-sheet">
+          <div className="hs-route-head">
+            <h3>Plan Your Route</h3>
+            <button type="button" className="hs-close-btn" onClick={() => setShowRoute(false)}>
+              <X size={18} />
+            </button>
+          </div>
+          <RoutePanel
+            origin={coords}
+            onRoutesUpdate={(next) => {
+              setMapPickEnabled(false);
+              setRouteOverlay(next);
+            }}
+            onEnableMapPick={() => {
+              setShowRoute(true);
+              setMapPickEnabled(true);
+            }}
+            mapPickEnabled={mapPickEnabled}
+            pickedDestination={routeOverlay?.destination || null}
+            onDestinationPreview={previewDestination}
+          />
+        </section>
+      )}
+
+      {!showRoute && (
+        <section className="hs-support-section">
+          <div className="hs-support-head">
+            <h3>Emergency Support</h3>
+            <span>Available 24/7</span>
+          </div>
+
+          <div className="hs-support-grid">
+            <button
+              type="button"
+              className="hs-support-card police"
+              onClick={() => {
+                window.location.href = `tel:${policeData.phone || "100"}`;
+              }}
+            >
+              <Shield size={20} />
+              <div className="hs-support-copy">
+                <strong>{policeData.name || "Nearest Police"}</strong>
+                <small>{policeDistanceKm.toFixed(2)} km away</small>
+              </div>
+              <ChevronRight size={16} />
+            </button>
+
+            <button
+              type="button"
+              className="hs-support-card helpline"
+              onMouseDown={handleHelplineLongPress}
+              onMouseUp={clearHelplineLongPress}
+              onMouseLeave={clearHelplineLongPress}
+              onTouchStart={handleHelplineLongPress}
+              onTouchEnd={clearHelplineLongPress}
+              onTouchCancel={clearHelplineLongPress}
+              onClick={() => {
+                clearHelplineLongPress();
+                setShowHelpline(true);
+              }}
+            >
+              <Phone size={20} />
+              <div className="hs-support-copy">
+                <strong>Helpline</strong>
+                <small>Tap for contacts, hold to call 112</small>
+              </div>
+              <ChevronRight size={16} />
+            </button>
+
+            <button
+              type="button"
+              className="hs-support-card hospital"
+              onClick={() => navigate("/map")}
+            >
+              <Heart size={20} />
+              <div className="hs-support-copy">
+                <strong>Nearby Hospital</strong>
+                <small>View hospitals on full safety map</small>
+              </div>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {showHelpline && <HelplineModal user={user} onClose={() => setShowHelpline(false)} />}
+      {showSOS && (
+        <SOSCountdown
+          user={user}
+          coords={coords}
+          onComplete={handleSOSComplete}
+          onCancel={() => setShowSOS(false)}
         />
       )}
-
-      {/* SOS Section */}
-      <div className="section-header" style={{ marginTop: 12 }}>
-        <span className="section-title">Emergency Actions</span>
-        <span className="section-action">Hold SOS for 3s</span>
-      </div>
-      <div className="sos-zone">
-        <div className="sos-btn-wrap">
-          <div className="sos-rings">
-            <div className="sos-ring" />
-            <div className="sos-ring" />
-            <div className="sos-ring" />
-          </div>
-          <button className="sos-btn" onClick={() => setShowSOS(true)}>
-            <span className="sos-label">SOS</span>
-            <span className="sos-sublabel">TAP TO ALERT</span>
-          </button>
-        </div>
-        <div className="sos-side-btns">
-          <button className="quick-btn" onClick={() => {
-            const url = `https://maps.google.com/?q=police+station+near+${coords.lat},${coords.lng}`;
-            window.open(url, "_blank");
-          }}>
-            <span className="qb-icon">??</span>
-            <span className="qb-text">
-              <span className="qb-title">Police Help</span>
-              <span className="qb-sub">{policeDistanceKm.toFixed(2)} km away</span>
-            </span>
-          </button>
-          <button className="quick-btn" onClick={() => setShowChat(true)}>
-            <span className="qb-icon">??</span>
-            <span className="qb-text">
-              <span className="qb-title">Chat Support</span>
-              <span className="qb-sub">AI + Human</span>
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Police Card */}
-      <div className="section-header">
-        <span className="section-title">Nearest Police Station</span>
-      </div>
-      <div className="police-card" onClick={() => window.location.href = `tel:${policeData.phone || "100"}`}>
-        <div className="police-icon">??</div>
-        <div className="police-info">
-          <div className="police-name">{policeData.name || "Nearest Station"}</div>
-          <div className="police-sub">{policeData.phone || "100"}</div>
-        </div>
-        <div className="police-distance">{policeDistanceKm.toFixed(2)} km</div>
-      </div>
-
-      <div style={{ height: 20 }} />
-
-      {/* Chat FAB */}
-      {!showChat && (
-        <button className="chat-fab" onClick={() => setShowChat(true)}>??</button>
-      )}
-
-      {/* Modals */}
-      {showHelpline && <HelplineModal user={user} onClose={() => setShowHelpline(false)} />}
-      {showSOS && <SOSCountdown user={user} coords={coords} onComplete={handleSOSComplete} onCancel={() => setShowSOS(false)} />}
       {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
     </div>
   );

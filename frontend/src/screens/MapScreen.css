@@ -1,0 +1,383 @@
+.ms-screen {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+.ms-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.ms-topbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ms-topbar-title svg {
+  color: var(--accent-teal);
+}
+
+.ms-topbar-title strong {
+  display: block;
+  font-size: 0.88rem;
+  letter-spacing: 0.3px;
+}
+
+.ms-topbar-title small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+}
+
+.ms-topbar-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.ms-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ms-icon-btn:hover {
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+}
+
+.ms-map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.ms-map,
+.ms-map .leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
+.ms-map .leaflet-control-attribution {
+  font-size: 0.58rem;
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--text-secondary);
+}
+
+.ms-map .leaflet-control-attribution a {
+  color: var(--accent-teal);
+}
+
+.ms-service-icon-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.ms-service-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.ms-service-police {
+  background: #2563eb;
+}
+
+.ms-service-hospital {
+  background: #dc2626;
+}
+
+.ms-popup {
+  min-width: 220px;
+  color: #111827;
+}
+
+.ms-popup strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.ms-popup p {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.ms-popup-type {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+}
+
+.ms-popup-type.police {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.ms-popup-type.hospital {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.ms-popup-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.ms-popup-btn {
+  border: 0;
+  border-radius: 8px;
+  background: #111827;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.ms-popup-btn.disabled {
+  background: #6b7280;
+  cursor: default;
+}
+
+.ms-legend {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 450;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ms-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  padding: 4px 8px;
+}
+
+.ms-legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.52rem;
+  font-family: var(--font-mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ms-legend-dot.police {
+  background: #2563eb;
+}
+
+.ms-legend-dot.hospital {
+  background: #dc2626;
+}
+
+.ms-legend-line {
+  width: 16px;
+  height: 0;
+  border-top: 3px solid;
+  border-radius: 4px;
+}
+
+.ms-legend-line.shortest {
+  border-top-color: #3b82f6;
+}
+
+.ms-legend-line.safest {
+  border-top-color: #16a34a;
+}
+
+.ms-helpline-panel {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: min(300px, calc(100% - 20px));
+  max-height: min(46vh, 360px);
+  overflow: auto;
+  z-index: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  padding: 10px;
+}
+
+.ms-helpline-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  letter-spacing: 0.4px;
+}
+
+.ms-helpline-head svg {
+  color: var(--accent-teal);
+}
+
+.ms-helpline-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.ms-helpline-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 7px 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ms-helpline-item strong {
+  display: block;
+  font-size: 0.73rem;
+}
+
+.ms-helpline-item small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  margin-top: 2px;
+}
+
+.ms-helpline-item svg {
+  color: var(--accent-teal);
+}
+
+.ms-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.ms-status-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+}
+
+.ms-status-chip.ms-status-error {
+  color: var(--accent-coral);
+}
+
+.ms-route-sheet {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 700;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  max-height: 55%;
+  overflow: auto;
+}
+
+.ms-route-head {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.ms-route-head strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.ms-route-head small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  margin-top: 2px;
+}
+
+.ms-route-sheet .route-panel {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.ms-spin {
+  animation: ms-spin 0.9s linear infinite;
+}
+
+@media (max-width: 760px) {
+  .ms-helpline-panel {
+    top: auto;
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-height: 30vh;
+  }
+
+  .ms-route-sheet {
+    max-height: 65%;
+  }
+}
+
+@keyframes ms-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

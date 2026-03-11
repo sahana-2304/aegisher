@@ -1,9 +1,12 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { app, auth, db, storage } from "./firebase";
 
 const USER_KEY = "aegisher_user";
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const STORAGE_DISABLED_KEY = "aegisher_storage_upload_disabled";
+const PROFILE_PHOTO_UPLOAD_MODE = String(import.meta.env.VITE_PROFILE_PHOTO_UPLOAD_MODE || "auto").toLowerCase();
 
 function mapFirebaseError(error) {
   const code = error?.code || "";
@@ -60,9 +63,94 @@ function buildSessionUser(uid, profile, fallbackEmail = "") {
     emergency1: profile?.emergency_contact_1 || "",
     emergency2: profile?.emergency_contact_2 || "",
     address: profile?.address || "",
+    photoUrl: profile?.photo_url || "",
     createdAt: profile?.created_at || new Date().toISOString(),
     lastLoginAt: profile?.last_login_at || new Date().toISOString(),
   };
+}
+
+function shouldSkipStorageUpload() {
+  if (PROFILE_PHOTO_UPLOAD_MODE === "firestore") return true;
+  if (typeof window === "undefined") return false;
+  if (PROFILE_PHOTO_UPLOAD_MODE !== "storage" && import.meta.env.DEV) return true;
+
+  return window.sessionStorage.getItem(STORAGE_DISABLED_KEY) === "1";
+}
+
+function markStorageUploadFailed() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(STORAGE_DISABLED_KEY, "1");
+}
+
+function loadImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not decode the selected image."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageToDataUrl(file) {
+  const image = await loadImageFile(file);
+  const maxDimension = 420;
+  const longestSide = Math.max(image.width, image.height) || 1;
+  const scale = Math.min(1, maxDimension / longestSide);
+
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not process this image.");
+  context.drawImage(image, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function deriveBucketFallbacks() {
+  const configuredBucket = (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "").trim();
+  if (!configuredBucket) return [];
+
+  const candidates = [];
+  if (configuredBucket.endsWith(".firebasestorage.app")) {
+    candidates.push(configuredBucket.replace(/\.firebasestorage\.app$/, ".appspot.com"));
+  } else if (configuredBucket.endsWith(".appspot.com")) {
+    candidates.push(configuredBucket.replace(/\.appspot\.com$/, ".firebasestorage.app"));
+  }
+
+  return [...new Set(candidates)];
+}
+
+async function uploadProfilePhotoToStorage(uid, safeName, file) {
+  const bucketCandidates = deriveBucketFallbacks();
+  const storageClients = [storage];
+
+  for (const bucket of bucketCandidates) {
+    storageClients.push(getStorage(app, `gs://${bucket}`));
+  }
+
+  let lastError = null;
+  for (const storageClient of storageClients) {
+    try {
+      const photoRef = ref(storageClient, `profile_photos/${uid}/${Date.now()}-${safeName}`);
+      await uploadBytes(photoRef, file, { contentType: file.type });
+      return await getDownloadURL(photoRef);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Storage upload failed.");
 }
 
 export async function registerUser(formData) {
@@ -153,4 +241,67 @@ export function getUser() {
 
 export function clearUser() {
   localStorage.removeItem(USER_KEY);
+}
+
+export async function logoutUser() {
+  try {
+    await signOut(auth);
+  } catch {
+    // Always clear local session even if Firebase sign-out fails.
+  }
+  clearUser();
+}
+
+export async function updateUserProfilePhoto(file) {
+  if (!file) throw new Error("Please choose an image file.");
+  if (!file.type?.startsWith("image/")) throw new Error("Only image files are supported.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Image must be 5 MB or smaller.");
+
+  const currentAuthUser = auth.currentUser;
+  const currentSessionUser = getUser();
+  const uid = currentAuthUser?.uid || currentSessionUser?.user_id || currentSessionUser?.id;
+  if (!uid) throw new Error("Session expired. Please log in again.");
+
+  const safeName = (file.name || "profile")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 120);
+
+  let photoUrl = "";
+  let photoSource = "storage";
+  if (!shouldSkipStorageUpload()) {
+    try {
+      photoUrl = await uploadProfilePhotoToStorage(uid, safeName, file);
+    } catch {
+      markStorageUploadFailed();
+    }
+  }
+
+  if (!photoUrl) {
+    // Fallback for bucket/CORS issues: persist a compressed data URL in Firestore.
+    photoUrl = await compressImageToDataUrl(file);
+    photoSource = "firestore_inline";
+  }
+
+  const now = new Date().toISOString();
+  await setDoc(
+    doc(db, "Users", uid),
+    {
+      user_id: uid,
+      email: currentSessionUser?.email || currentAuthUser?.email || "",
+      photo_url: photoUrl,
+      photo_source: photoSource,
+      updated_at: now,
+    },
+    { merge: true },
+  );
+
+  const updatedUser = persistUser({
+    ...(currentSessionUser || {}),
+    id: uid,
+    user_id: uid,
+    email: currentSessionUser?.email || currentAuthUser?.email || "",
+    photoUrl,
+  });
+
+  return updatedUser;
 }
