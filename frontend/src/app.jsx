@@ -10,6 +10,7 @@ import ModelTestingScreen from "./screens/ModelTestingScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import PostDetailScreen from "./screens/PostDetailScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import ReportIncidentScreen from "./screens/ReportIncidentScreen";
 import { getUser, logoutUser } from "./services/auth";
 import "./styles/global.css";
 
@@ -56,6 +57,9 @@ function MainShell({ children }) {
       <nav className="bottom-nav">
         <NavLink to="/home" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">S</span><span className="nav-label">Safety</span>
+        </NavLink>
+        <NavLink to="/report-incident" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <span className="nav-icon">+</span><span className="nav-label">Report</span>
         </NavLink>
         <NavLink to="/map" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <span className="nav-icon">M</span><span className="nav-label">Map</span>
@@ -156,6 +160,16 @@ export default function App() {
           <ProtectedPage user={user}>
             <MainShell>
               <ProfileScreen user={user} onLogout={handleLogout} onUserUpdate={setUser} />
+            </MainShell>
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/report-incident"
+        element={
+          <ProtectedPage user={user}>
+            <MainShell>
+              <ReportIncidentScreen user={user} />
             </MainShell>
           </ProtectedPage>
         }

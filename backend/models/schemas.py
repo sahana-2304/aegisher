@@ -1,8 +1,8 @@
 """
 AegisHer — Pydantic request/response models
 """
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
@@ -145,6 +145,71 @@ class CommunityPost(BaseModel):
     location_label: Optional[str] = None
 
 
+# Incident reporting (beta)
+IncidentType = Literal[
+    "verbal_abuse",
+    "stalking",
+    "physical_harassment",
+    "workplace_harassment",
+    "public_transport_harassment",
+    "other",
+]
+
+
+class IncidentDraftRequest(BaseModel):
+    source: Optional[str] = "web_beta"
+    app_version: Optional[str] = None
+
+
+class IncidentDraftResponse(BaseModel):
+    incident_id: str
+    status: str
+    created_at: str
+
+
+class IncidentLocationPayload(BaseModel):
+    label: str = Field(min_length=3, max_length=300)
+    latitude: float
+    longitude: float
+    source: Optional[str] = None
+
+
+class IncidentSubmitRequest(BaseModel):
+    incident_type: IncidentType
+    description: str = Field(min_length=10, max_length=4000)
+    incident_time_iso: str
+    location: IncidentLocationPayload
+    anonymous_report: bool = True
+    legal_disclaimer_accepted: bool
+    truth_declaration_accepted: bool
+    fir_summary_text: Optional[str] = Field(default=None, max_length=8000)
+    app_version: Optional[str] = None
+    map_to_community: bool = True
+
+
+class IncidentEvidenceMeta(BaseModel):
+    evidence_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    storage_path: str
+    uploaded_at: str
+
+
+class IncidentEvidenceUploadResponse(BaseModel):
+    incident_id: str
+    uploaded_count: int
+    evidence: List[IncidentEvidenceMeta]
+
+
+class IncidentSubmitResponse(BaseModel):
+    incident_id: str
+    status: str
+    submitted_at: str
+    idempotent: bool = False
+
+
 # ─── Police ───────────────────────────────────────────────────────────
 class PoliceStation(BaseModel):
     name: str
@@ -189,10 +254,16 @@ class NearbyServicesResponse(BaseModel):
 
 
 # Chat
+class ChatHistoryTurn(BaseModel):
+    role: str                # user | assistant
+    text: str
+
+
 class ChatMessage(BaseModel):
     message: str
     session_id: str
     user_id: Optional[str] = None
+    history: Optional[List[ChatHistoryTurn]] = None
 
 
 class ChatResponse(BaseModel):

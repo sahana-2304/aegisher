@@ -8,10 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from dotenv import load_dotenv
 
-from routers import risk, routes, sos, community, police, auth, chat, nearby
-from services.firebase import init_firebase
-
 load_dotenv(Path(__file__).resolve().parent / ".env")
+
+from routers import risk, routes, sos, community, police, auth, chat, nearby, incidents
+from services.firebase import init_firebase
 
 app = FastAPI(
     title="AegisHer API",
@@ -45,6 +45,7 @@ app.include_router(community.router, prefix="/api/community", tags=["Community"]
 app.include_router(police.router, prefix="/api/police", tags=["Police Assistance"])
 app.include_router(nearby.router, prefix="/api/nearby", tags=["Nearby Services"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Helpline Chat"])
+app.include_router(incidents.router, prefix="/api/incidents", tags=["Incident Reports"])
 
 
 @app.get("/health")

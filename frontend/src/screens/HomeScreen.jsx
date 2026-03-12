@@ -16,6 +16,7 @@ import {
   Bell,
   ChevronDown,
   ChevronRight,
+  FileText,
   Heart,
   Info,
   LocateFixed,
@@ -492,6 +493,10 @@ export default function HomeScreen({ user }) {
             <MessageCircle size={18} />
             <span>Chat</span>
           </button>
+          <button type="button" className="hs-action-btn" onClick={() => navigate("/report-incident")}>
+            <FileText size={18} />
+            <span>Report</span>
+          </button>
           <button type="button" className="hs-action-btn danger" onClick={() => setShowSOS(true)}>
             <AlertTriangle size={18} />
             <span>SOS</span>
@@ -594,7 +599,7 @@ export default function HomeScreen({ user }) {
           onCancel={() => setShowSOS(false)}
         />
       )}
-      {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
+      {showChat && <ChatPanel user={user} onClose={() => setShowChat(false)} />}
     </div>
   );
 }

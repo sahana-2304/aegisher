@@ -307,9 +307,23 @@ export const api = {
     request("/api/routes/feedback", { method: "POST", body: JSON.stringify(data) }),
 
   // Chat
-  chatMessage: (message, sessionId) =>
-    request("/api/chat/message", {
+  chatMessage: (messageOrPayload, sessionId) => {
+    const payload =
+      typeof messageOrPayload === "object" && messageOrPayload !== null
+        ? {
+            message: String(messageOrPayload.message || ""),
+            session_id: String(messageOrPayload.sessionId || ""),
+            user_id: messageOrPayload.userId ?? null,
+            history: Array.isArray(messageOrPayload.history) ? messageOrPayload.history : [],
+          }
+        : {
+            message: String(messageOrPayload || ""),
+            session_id: String(sessionId || ""),
+          };
+
+    return request("/api/chat/message", {
       method: "POST",
-      body: JSON.stringify({ message, session_id: sessionId }),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 };

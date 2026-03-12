@@ -1,78 +1,211 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-const BOT_RESPONSES = [
-  "I'm here to help. Are you safe right now? If you're in immediate danger, please press the SOS button or call 112.",
-  "I understand. Can you tell me more about your current situation? I'm listening.",
-  "Your safety is the priority. Would you like me to connect you with a human helpline operator or help you find the nearest police station?",
-  "I'm escalating this to a human operator now. Please stay on the line. Do you need me to initiate a call to the helpline?",
-  "Help is on the way. You can also directly call 1091 (Women Helpline) or 112 for immediate assistance.",
+import { api } from "../services/api";
+
+function now() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function createSessionId() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // ignore and fallback below
+  }
+  return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const QUICK_PROMPTS = [
+  "I need help right now.",
+  "Show nearest police station.",
+  "What helpline numbers can I call?",
+  "I feel unsafe on my route.",
 ];
 
-export default function ChatPanel({ onClose }) {
-  const [messages, setMessages] = useState([
-    { role: "bot", text: "Hi, I'm your AegisHer safety assistant. How can I help you right now?", time: now() },
-  ]);
-  const [input, setInput] = useState("");
-  const [botIdx, setBotIdx] = useState(0);
-  const [isHuman, setIsHuman] = useState(false);
+export default function ChatPanel({ onClose, user }) {
+  const sessionId = useMemo(() => createSessionId(), []);
   const bottomRef = useRef(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const [messages, setMessages] = useState([
+    {
+      role: "bot",
+      text: "Hi, I am your AegisHer support assistant. Tell me what is happening, and I will help step by step.",
+      time: now(),
+      operator: false,
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [isHuman, setIsHuman] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
-  function now() { return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isSending]);
 
-  function send() {
-    if (!input.trim()) return;
-    const userMsg = { role: "user", text: input, time: now() };
-    setMessages((m) => [...m, userMsg]);
+  async function send(customText) {
+    if (isSending) return;
+
+    const text = String(customText ?? input ?? "").trim();
+    if (!text) return;
+
+    const userMsg = { role: "user", text, time: now() };
+    const historyForApi = messages
+      .filter((msg) => msg.role === "user" || msg.role === "bot")
+      .slice(-8)
+      .map((msg) => ({
+        role: msg.role === "bot" ? "assistant" : "user",
+        text: msg.text,
+      }));
+
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setIsSending(true);
 
-    const needsHuman = /help|danger|scared|unsafe|emergency|hurt|attack/i.test(input);
-    setTimeout(() => {
-      const botReply = needsHuman
-        ? "I'm connecting you with a human helpline operator right away. You're not alone. Do you want to initiate a direct call with the helpline?"
-        : BOT_RESPONSES[botIdx % BOT_RESPONSES.length];
-      if (needsHuman) setIsHuman(true);
-      setBotIdx((i) => i + 1);
-      setMessages((m) => [...m, { role: "bot", text: botReply, time: now(), operator: needsHuman }]);
-    }, 800);
+    try {
+      const response = await api.chatMessage({
+        message: text,
+        sessionId,
+        userId: user?.uid || user?.user_id || user?.id || null,
+        history: historyForApi,
+      });
+
+      const escalated = Boolean(response?.escalated || response?.suggest_call);
+      if (escalated) setIsHuman(true);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          text:
+            response?.reply ||
+            "I am here with you. If this is urgent, call 112 now.",
+          time: now(),
+          operator: escalated,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          text:
+            "Support server is temporarily unavailable. If this is urgent, call 112 now. You can also call Women Helpline 1091.",
+          time: now(),
+          operator: true,
+        },
+      ]);
+      setIsHuman(true);
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
     <div className="chat-panel">
       <div className="chat-header">
         <div className="chat-header-info">
-          <div className="chat-avatar">{isHuman ? "👩" : "🛡️"}</div>
+          <div className="chat-avatar">{isHuman ? "OP" : "AI"}</div>
           <div className="chat-header-text">
-            <h4>{isHuman ? "Safety Operator" : "AegisHer Assistant"}</h4>
-            <p>{isHuman ? "Human Support • Online" : "AI Powered • Always Available"}</p>
+            <h4>{isHuman ? "Safety Operator Mode" : "AegisHer Assistant"}</h4>
+            <p>{isHuman ? "Emergency Support Active" : "AI Support Online"}</p>
           </div>
         </div>
-        <button className="chat-close" onClick={onClose}>✕</button>
+        <button type="button" className="chat-close" onClick={onClose}>
+          x
+        </button>
       </div>
 
       <div className="chat-messages">
-        {messages.map((msg, i) => (
-          <div key={i} className={`message ${msg.role}`}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {QUICK_PROMPTS.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => send(prompt)}
+              disabled={isSending}
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "5px 10px",
+                color: "var(--text-secondary)",
+                fontSize: "0.68rem",
+                cursor: isSending ? "not-allowed" : "pointer",
+              }}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+
+        {messages.map((msg, index) => (
+          <div key={`${msg.time}-${index}`} className={`message ${msg.role}`}>
             <div className="message-bubble">
-              {msg.operator && <span style={{ display: "block", fontSize: "0.7rem", color: "var(--accent-teal)", marginBottom: 4 }}>👩 Human Operator</span>}
+              {msg.operator && (
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "0.7rem",
+                    color: "var(--accent-teal)",
+                    marginBottom: 4,
+                  }}
+                >
+                  Human support priority
+                </span>
+              )}
               {msg.text}
             </div>
             <span className="message-time">{msg.time}</span>
           </div>
         ))}
+
+        {isSending && (
+          <div className="message bot">
+            <div className="message-bubble">Typing...</div>
+            <span className="message-time">{now()}</span>
+          </div>
+        )}
+
         {isHuman && (
           <div style={{ display: "flex", gap: 8, margin: "4px 0" }}>
-            <button onClick={() => window.location.href = "tel:1091"} style={{
-              background: "rgba(0,212,180,0.1)", border: "1px solid var(--border-accent)",
-              borderRadius: 8, padding: "8px 14px", cursor: "pointer",
-              color: "var(--accent-teal)", fontSize: "0.78rem", fontFamily: "var(--font-body)"
-            }}>📞 Call 1091</button>
-            <button onClick={() => window.location.href = "tel:112"} style={{
-              background: "rgba(255,91,107,0.1)", border: "1px solid rgba(255,91,107,0.3)",
-              borderRadius: 8, padding: "8px 14px", cursor: "pointer",
-              color: "var(--accent-coral)", fontSize: "0.78rem", fontFamily: "var(--font-body)"
-            }}>🚨 Call 112</button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "tel:1091";
+              }}
+              style={{
+                background: "rgba(179,0,179,0.14)",
+                border: "1px solid var(--border-accent)",
+                borderRadius: 8,
+                padding: "8px 14px",
+                cursor: "pointer",
+                color: "var(--accent-teal)",
+                fontSize: "0.78rem",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              Call 1091
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "tel:112";
+              }}
+              style={{
+                background: "rgba(217,0,217,0.12)",
+                border: "1px solid rgba(217,0,217,0.35)",
+                borderRadius: 8,
+                padding: "8px 14px",
+                cursor: "pointer",
+                color: "var(--accent-coral)",
+                fontSize: "0.78rem",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              Call 112
+            </button>
           </div>
         )}
         <div ref={bottomRef} />
@@ -83,10 +216,17 @@ export default function ChatPanel({ onClose }) {
           className="chat-input"
           placeholder="Type your message..."
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          disabled={isSending}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              send();
+            }
+          }}
         />
-        <button className="chat-send" onClick={send}>➤</button>
+        <button type="button" className="chat-send" onClick={() => send()} disabled={isSending}>
+          {isSending ? "..." : ">"}
+        </button>
       </div>
     </div>
   );
