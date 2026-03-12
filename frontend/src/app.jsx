@@ -5,6 +5,7 @@ import CommunityScreen from "./screens/CommunityScreen";
 import HomeScreen from "./screens/HomeScreen";
 import LoginScreen from "./screens/LoginScreen";
 import MapScreen from "./screens/MapScreen";
+import MeshChatScreen from "./screens/MeshChatScreen";
 import ModelTestingScreen from "./screens/ModelTestingScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import PostDetailScreen from "./screens/PostDetailScreen";
@@ -138,6 +139,14 @@ export default function App() {
         element={
           <ProtectedPage user={user}>
             <PostDetailScreen user={user} />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/mesh-chat"
+        element={
+          <ProtectedPage user={user}>
+            <MeshChatScreen user={user} />
           </ProtectedPage>
         }
       />

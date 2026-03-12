@@ -1,0 +1,73 @@
+Backend quick test commands (PowerShell)
+Use curl.exe (not curl alias).
+
+# Base URL
+$BASE_URL = "http://localhost:8000"
+
+# 1) Health
+curl.exe "$BASE_URL/health"
+
+# 2) Risk prediction
+curl.exe -X POST "$BASE_URL/api/risk/predict" `
+  -H "Content-Type: application/json" `
+  -d '{"latitude":13.0827,"longitude":80.2707,"timestamp":"2026-03-11T10:00:00Z"}'
+
+# 3) Risk heatmap
+curl.exe "$BASE_URL/api/risk/heatmap?lat=13.0827&lng=80.2707&radius_km=2.0"
+
+# 4) Model status (dev mode only: APP_ENV must NOT be production)
+curl.exe "$BASE_URL/api/risk/model/status"
+
+# 5) Model test (dev mode only)
+curl.exe -X POST "$BASE_URL/api/risk/model/test" `
+  -H "Content-Type: application/json" `
+  -d '{"latitude":13.0827,"longitude":80.2707,"hour":21,"day_type":"weekday","lighting_score":0.35,"crowd_density":0.45,"crime_density_norm":0.62,"police_distance_km":1.1,"cctv_presence":0,"past_incident_count":4}'
+
+# 6) Safe route
+curl.exe -X POST "$BASE_URL/api/routes/safe" `
+  -H "Content-Type: application/json" `
+  -d '{"origin":{"latitude":13.0827,"longitude":80.2707},"destination":{"latitude":13.0418,"longitude":80.2341},"transport_mode":"walking"}'
+
+# 7) Route feedback
+curl.exe -X POST "$BASE_URL/api/routes/feedback" `
+  -H "Content-Type: application/json" `
+  -d '{"route_id":"test-route-1","user_id":"test-user-1","rating":5,"safety_perception":"safe","comments":"Route felt well lit and busy."}'
+
+# 8) Police endpoints
+curl.exe "$BASE_URL/api/police/nearest?lat=13.0827&lng=80.2707"
+curl.exe "$BASE_URL/api/police/all"
+
+# 9) Nearby services aggregator
+curl.exe "$BASE_URL/api/nearby/services?lat=13.0827&lng=80.2707&radius_m=3000&limit=10"
+
+# 10) Chat message
+curl.exe -X POST "$BASE_URL/api/chat/message" `
+  -H "Content-Type: application/json" `
+  -d '{"message":"I need helpline number","session_id":"sess-001","user_id":"test-user-1"}'
+
+# 11) Community report + fetch reports
+curl.exe -X POST "$BASE_URL/api/community/report" `
+  -H "Content-Type: application/json" `
+  -d '{"user_id":"test-user-1","latitude":13.0827,"longitude":80.2707,"incident_type":"unsafe_area","description":"Dark street, no people around","timestamp":"2026-03-11T10:10:00Z"}'
+curl.exe "$BASE_URL/api/community/reports?lat=13.0827&lng=80.2707&radius_km=1.0"
+
+# 12) Community posts + model export
+curl.exe "$BASE_URL/api/community/posts?limit=10"
+curl.exe "$BASE_URL/api/community/model/export?limit=20"
+
+# 13) SOS trigger (requires user_id present in Firestore)
+curl.exe -X POST "$BASE_URL/api/sos/trigger" `
+  -H "Content-Type: application/json" `
+  -d '{"user_id":"<FIREBASE_USER_ID>","latitude":13.0827,"longitude":80.2707,"device_ip":"127.0.0.1","timestamp":"2026-03-11T10:12:00Z"}'
+
+# 14) SOS status
+curl.exe "$BASE_URL/api/sos/status/<SOS_ID>"
+
+# 15) Auth endpoints (require valid Firebase ID token)
+$TOKEN = "<FIREBASE_ID_TOKEN>"
+curl.exe -X POST "$BASE_URL/api/auth/register" `
+  -H "Authorization: Bearer $TOKEN" `
+  -H "Content-Type: application/json" `
+  -d '{"name":"Akeel","phone":"+919999999999","email":"akeel@example.com","emergency_contact_1":"+919111111111","emergency_contact_2":"+919222222222","address":"Chennai","fcm_token":null}'
+curl.exe -H "Authorization: Bearer $TOKEN" "$BASE_URL/api/auth/profile/<FIREBASE_USER_ID>"
+
